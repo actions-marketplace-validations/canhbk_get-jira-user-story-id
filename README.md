@@ -34,7 +34,7 @@ jobs:
     steps:
       - name: Get the JIRA User Story, Bug, or Task ID
         id: get_jira_issue_id
-        uses: canhbk/get-jira-user-story-id@v1.1.0
+        uses: canhbk/get-jira-user-story-id@v1.1.1
         with:
           issue_id: "JIRA-123"
           jira_user: ${{ secrets.JIRA_USER }}

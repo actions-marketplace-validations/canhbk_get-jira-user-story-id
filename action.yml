@@ -22,6 +22,7 @@ outputs:
   result_id:
     description: "The ID of the User Story associated with the subtask, or the ID of the User Story, Bug, or Task, in lowercase"
     value: ${{ steps.get_jira_issue_id.outputs.result_id }}
+
 runs:
   using: "composite"
   steps:
@@ -34,28 +35,25 @@ runs:
         JIRA_BASE_URL=${{ inputs.jira_base_url }}
         ISSUE_ID=${{ inputs.issue_id }}
 
-        # Fetch the issue details
         RESPONSE=$(curl -s -u $JIRA_USER:$JIRA_API_TOKEN \
           -X GET -H "Content-Type: application/json" \
           "$JIRA_BASE_URL/rest/api/3/issue/$ISSUE_ID")
 
-        # Extract the issue type
-        ISSUE_TYPE=$(echo $RESPONSE | jq -r '.fields.issuetype.name' | tr '[:upper:]' '[:lower:]')
+        ISSUE_TYPE=$(echo "$RESPONSE" | jq -r '.fields.issuetype.name' | tr '[:upper:]' '[:lower:]')
 
-        # Extract the parent ID if it exists (for Subtasks)
-        PARENT_ID=$(echo $RESPONSE | jq -r '.fields.parent.key')
-
-        # Determine the result ID based on the issue type
-        if [ "$ISSUE_TYPE" = "subtask" ]; then
-          RESULT_ID=$PARENT_ID
+        if [ "$ISSUE_TYPE" = "sub-task" ] || [ "$ISSUE_TYPE" = "subtask" ]; then
+          PARENT_ID=$(echo "$RESPONSE" | jq -r '.fields.parent.key')
+          if [ "$PARENT_ID" = "null" ] || [ -z "$PARENT_ID" ]; then
+            echo "Error: Issue is a sub-task but has no parent." >&2
+            exit 1
+          fi
+          RESULT_ID="$PARENT_ID"
         elif [ "$ISSUE_TYPE" = "story" ] || [ "$ISSUE_TYPE" = "bug" ] || [ "$ISSUE_TYPE" = "task" ]; then
-          RESULT_ID=$ISSUE_ID
+          RESULT_ID="$ISSUE_ID"
         else
-          echo "Error: The issue ID $ISSUE_ID is not a Subtask, User Story, Bug, or Task. It is a $ISSUE_TYPE." >&2
+          echo "Error: The issue ID $ISSUE_ID is not a supported type. Found type: $ISSUE_TYPE." >&2
           exit 1
         fi
 
-        RESULT_ID=$(echo $RESULT_ID | tr '[:upper:]' '[:lower:]')
-
-        # Set the output
-        echo "result_id=$RESULT_ID" >> $GITHUB_OUTPUT
+        RESULT_ID=$(echo "$RESULT_ID" | tr '[:upper:]' '[:lower:]')
+        echo "result_id=$RESULT_ID" >> "$GITHUB_OUTPUT"
